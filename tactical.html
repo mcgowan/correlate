@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Correlate Tactical</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%23020705%27/%3E%3Cg fill=%27%234af626%27%3E%3Crect x=%275%27 y=%275%27 width=%279%27 height=%279%27/%3E%3Crect x=%2718%27 y=%275%27 width=%279%27 height=%279%27 opacity=%27.55%27/%3E%3Crect x=%275%27 y=%2718%27 width=%279%27 height=%279%27 opacity=%27.35%27/%3E%3Crect x=%2718%27 y=%2718%27 width=%279%27 height=%279%27 opacity=%27.8%27/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/tactical.css">
+</head>
+<body>
+<div class="crt">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="wordmark">CORRELATE</span>
+      <span class="sub">AN/MET-1 · TACTICAL METRIC SCOPE</span>
+    </div>
+    <div class="monthnav">
+      <button class="rng rng--sm" id="prev" aria-label="Previous month">&#9664; PREV</button>
+      <h2 id="month-title">September 2026</h2>
+      <button class="rng rng--sm" id="next" aria-label="Next month">NEXT &#9654;</button>
+      <button class="rng rng--sm rng--on" id="today-btn">TODAY</button>
+      <a class="rng rng--sm" href="index.html" title="Switch to the standard interface">STD UI</a>
+      <span class="clock-wrap"><span class="clock js-clock">--:--:--</span><span class="date js-date">--- -- --- ----</span></span>
+    </div>
+  </header>
+
+  <main class="app">
+    <aside class="pane left">
+      <div class="pane-head">
+        <div><div class="eyebrow">Metric registry</div></div>
+        <div class="pane-actions">
+          <button class="rng rng--sm" id="add-metric">Add</button>
+          <button class="rng rng--sm" id="metrics-toggle" type="button" aria-expanded="true" aria-controls="metric-list" title="Collapse registry">&lt;</button>
+        </div>
+      </div>
+      <div class="metric-list" id="metric-list"></div>
+    </aside>
+
+    <section class="pane center">
+      <div class="scope">
+        <i class="corner corner--tl"></i><i class="corner corner--tr"></i>
+        <i class="corner corner--bl"></i><i class="corner corner--br"></i>
+        <div class="hud hud--tl">LOGGED<b class="js-hud-logged">0 / 0</b><span class="js-hud-logged-sub">DAYS THIS MONTH</span></div>
+        <div class="hud hud--tr">SCORE<b class="js-hud-score">—</b><span>MONTH AVG · PER LOGGED DAY</span></div>
+        <div class="hud hud--bl">LINK<b class="js-hud-link">SYNCED</b><span>LOCAL STORE</span></div>
+        <div class="hud hud--br">LOCK<b class="js-hud-lock hud__red">NONE</b><span class="js-hud-lock-sub">NO TARGET</span></div>
+        <div class="cal-head">
+          <div class="view-switch" id="view-switch" role="tablist" aria-label="View">
+            <button type="button" class="rng rng--sm" data-view="calendar" role="tab" aria-selected="true">Calendar</button>
+            <button type="button" class="rng rng--sm" data-view="graph" role="tab" aria-selected="false">Graph</button>
+          </div>
+          <button class="rng rng--sm filter-btn" id="metric-filter" type="button" aria-haspopup="menu" aria-expanded="false" title="Choose which metrics to show">All metrics</button>
+        </div>
+        <div class="dow"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+        <div class="grid" id="grid"></div>
+        <div class="graph" id="graph" hidden></div>
+      </div>
+    </section>
+
+    <aside class="pane right">
+      <div class="panel__header"><span>TARGET DAY</span><span class="lock-status js-lock-status">NO LOCK</span></div>
+      <div id="inspector"></div>
+    </aside>
+  </main>
+
+  <footer class="statusbar">
+    <span>METRICS<b class="js-st-metrics">0</b></span>
+    <span>OPTIONS<b class="js-st-options">0</b></span>
+    <span>DAYS LOGGED<b class="js-st-days">0</b></span>
+    <span>STREAK<b class="js-st-streak">0</b></span>
+    <span class="keys">KEYS<b>◀ ▶ MONTH · T TODAY · G GRAPH/CAL · CLICK DAY TO LOCK</b></span>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="scanlines" aria-hidden="true"></div>
+<div class="boot" aria-hidden="true"><span>CORRELATE ▸ SCOPE INIT ▸ LOADING METRIC LOG<i class="cursor">_</i></span></div>
+
+<script src="js/app.js"></script>
+<script src="js/tactical.js"></script>
+</body>
+</html>

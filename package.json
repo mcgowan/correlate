@@ -1,0 +1,9 @@
+{
+  "name": "correlate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Daily metrics tracker with a side-by-side calendar for spotting correlations (static, no build step)",
+  "scripts": {
+    "start": "python3 -m http.server 8080"
+  }
+}
