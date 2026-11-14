@@ -66,7 +66,8 @@
   let selected = iso(today);
   let editing = new Set();
 
-  function defaultSettings() { return { theme: 'system', metricsCollapsed: false, visible: null, view: 'calendar' }; }   // visible: null = all metrics, else [ids]
+  function defaultSettings() { return { theme: 'system', metricsCollapsed: false, visible: null, view: 'calendar', graph: defaultGraph() }; }   // visible: null = all metrics, else [ids]
+  function defaultGraph() { return { period: '30d', to: null, from: null, customTo: null, res: 'auto' }; }   // to: anchor day for presets (null = today)
   function normalise(s) {
     // fill in anything missing so the rest of the app can rely on the full shape
     const out = { version: STORE_VERSION, metrics: [], entries: {}, settings: defaultSettings() };
@@ -77,6 +78,10 @@
       out.settings = { ...out.settings, ...s.settings }; delete out.settings.corr;
       if (!Array.isArray(out.settings.visible)) out.settings.visible = null;
       if (out.settings.view !== 'graph') out.settings.view = 'calendar';
+      const g = { ...defaultGraph(), ...(out.settings.graph && typeof out.settings.graph === 'object' ? out.settings.graph : {}) };
+      if (!['30d', '90d', '180d', '1y', 'all', 'custom'].includes(g.period)) g.period = '30d';
+      if (!['auto', 'daily', 'weekly'].includes(g.res)) g.res = 'auto';
+      out.settings.graph = g;
     }
     return out;
   }
@@ -421,8 +426,10 @@
 
   // ---------- render: calendar ----------
   function renderCalendar() {
-    document.getElementById('month-title').textContent = `${MONTHS[view.m]} ${view.y}`;
     const graphMode = state.settings.view === 'graph';
+    document.getElementById('month-title').textContent = `${MONTHS[view.m]} ${view.y}`;
+    const monthnav = document.querySelector('.monthnav'); if (monthnav) monthnav.hidden = graphMode;   // month stepping and Today belong to the calendar
+    renderGraphControls(graphMode);
     const grid = document.getElementById('grid'), graph = document.getElementById('graph'), dow = document.querySelector('.dow');
     document.querySelectorAll('#view-switch [data-view]').forEach(b => {
       const on = b.dataset.view === (graphMode ? 'graph' : 'calendar');
@@ -456,9 +463,11 @@
   }
 
   // ---------- render: graph ----------
-  // One strip per visible metric on a shared day axis. y is the option's rank within its metric
-  // (lowest value at the bottom), points wear the option colour, the line wears the metric's middle
-  // colour, gaps break the line. Hover shows a crosshair + tooltip; click locks that day.
+  // The graph has its own time window (settings.graph), independent of the calendar's month:
+  // presets end on an anchor day (today unless panned), Custom is an explicit range, All spans the log.
+  // Resolution is daily or weekly (auto: weekly above 180 days). Daily columns that don't fit the pane
+  // scroll horizontally behind a pinned label gutter. Each strip: the day score first (always), then
+  // one per visible metric; y is the option's rank within its metric (lowest value at the bottom).
   const svgNS = 'http://www.w3.org/2000/svg';
   const el = (tag, attrs = {}, text) => {
     const n = document.createElementNS(svgNS, tag);
@@ -466,60 +475,120 @@
     if (text !== undefined) n.textContent = text;
     return n;
   };
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const PERIOD_DAYS = { '30d': 30, '90d': 90, '180d': 180, '1y': 365 };
+  const PERIOD_LABEL = { '30d': 'Last 30 days', '90d': 'Last 90 days', '180d': 'Last 180 days', '1y': 'Last year', all: 'All days', custom: 'Custom range' };
+  const shortDate = d => `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
+  const longDate = d => `${shortDate(d)}, ${d.getFullYear()}`;
+
+  function graphRange() {
+    const g = state.settings.graph;
+    const anchor = today;
+    let from, to;
+    if (g.period === 'custom' && g.from && g.customTo) { from = fromIso(g.from); to = fromIso(g.customTo); if (from > to) [from, to] = [to, from]; }
+    else if (g.period === 'all') {
+      const keys = Object.keys(state.entries).filter(k => state.metrics.some(m => state.entries[k][m.id])).sort();
+      to = today; from = keys.length ? fromIso(keys[0]) : addDays(today, -29);
+      if (keys.length && fromIso(keys[keys.length - 1]) > to) to = fromIso(keys[keys.length - 1]);
+      if (addDays(from, 29) > to) from = addDays(to, -29);           // never narrower than a month
+    } else { const n = PERIOD_DAYS[g.period] || 30; to = anchor; from = addDays(to, -(n - 1)); }
+    const days = Math.round((to - from) / 86400000) + 1;
+    const res = g.res === 'daily' || g.res === 'weekly' ? g.res : (days > 180 ? 'weekly' : 'daily');
+    return { from, to, days, res };
+  }
+  function graphTitle() {
+    const g = state.settings.graph, r = graphRange();
+    const span = `${longDate(r.from)} – ${longDate(r.to)}`;
+    if (g.period === 'custom' || g.period === 'all') return span;
+    return PERIOD_LABEL[g.period];
+  }
+  // columns: one per day, or one per week (Sunday-start, clipped to the range)
+  function graphColumns(r) {
+    const cols = [];
+    if (r.res === 'daily') {
+      for (let d = new Date(r.from); d <= r.to; d = addDays(d, 1)) cols.push({ from: new Date(d), to: new Date(d), keys: [iso(d)] });
+    } else {
+      let start = new Date(r.from);
+      while (start <= r.to) {
+        const end = addDays(start, 6 - start.getDay());                  // through Saturday
+        const to = end > r.to ? new Date(r.to) : end;
+        const keys = []; for (let d = new Date(start); d <= to; d = addDays(d, 1)) keys.push(iso(d));
+        cols.push({ from: new Date(start), to, keys });
+        start = addDays(to, 1);
+      }
+    }
+    return cols;
+  }
+
   let graphTip = null;
   function renderGraph() {
     const host = document.getElementById('graph'); host.innerHTML = '';
     const shown = visibleMetrics();
-    const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
-    const W = Math.max(320, host.clientWidth || 600);
-    if (!state.metrics.length) {
-      host.innerHTML = `<p class="graph-empty">No metrics yet. Add one from the metrics pane.</p>`;
-      return;
-    }
-    const L = 96, R = 14, TOP = 6, HEAD = 22, PLOT = 68, GAP = 16, AXIS = 30;
-    const rowH = HEAD + PLOT + GAP;
-    const strips = shown.length + 1;                       // day score first, then the visible metrics
+    if (!state.metrics.length) { host.innerHTML = `<p class="graph-empty">No metrics yet. Add one from the metrics pane.</p>`; return; }
+    const r = graphRange(), cols = graphColumns(r), N = cols.length, weekly = r.res === 'weekly';
+    const hostW = Math.max(320, host.clientWidth || 600);
+    // left gutter wide enough for the longest label it has to pin when the graph scrolls
+    const longest = Math.max(9, ...shown.map(m => m.name.length), ...shown.flatMap(m => m.options.map(o => o.label.length)));
+    const L = Math.min(180, Math.max(96, 14 + longest * 6.6)), R = 14, TOP = 6, HEAD = 22, PLOT = 68, GAP = 16, AXIS = 44;
+    const minCol = weekly ? 11 : 12;
+    const fits = (hostW - L - R) / N >= minCol;
+    const colW = fits ? (hostW - L - R) / N : (weekly ? 16 : 14);
+    const W = fits ? hostW : Math.ceil(L + N * colW + R);
+    const rowH = HEAD + PLOT + GAP, strips = shown.length + 1;
     const H = TOP + strips * rowH + AXIS;
-    const colW = (W - L - R) / daysInMonth;
-    const x = d => L + (d - 0.5) * colW;
-    const svg = el('svg', { class: 'graph-svg', viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': `${shown.map(m => m.name).join(', ')} by day, ${MONTHS[view.m]} ${view.y}` });
+    const x = i => L + (i + 0.5) * colW;
+    const todayKey = iso(today);
+    const colOf = key => cols.findIndex(c => c.keys.includes(key));
+
+    const svg = el('svg', { class: 'graph-svg', viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': `Day score and ${shown.map(m => m.name).join(', ')}, ${graphTitle()}` });
     const under = el('g'), marks = el('g'), over = el('g');
     svg.append(under, marks, over);
-
-    // weekend bands and the selected day, spanning every strip
     const plotTop = TOP, plotBottom = TOP + strips * rowH - GAP;
-    for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(view.y, view.m, d), key = iso(date);
-      if (date.getDay() === 0 || date.getDay() === 6) under.append(el('rect', { class: 'g-weekend', x: L + (d - 1) * colW, y: plotTop, width: colW, height: plotBottom - plotTop }));
-      if (key === selected) under.append(el('rect', { class: 'g-selected', x: L + (d - 1) * colW, y: plotTop - 2, width: colW, height: plotBottom - plotTop + 4 }));
-    }
 
-    // day score strip: every metric counts, whatever the filter says
+    // backgrounds: weekends (daily), the selected column, today
+    const selIdx = colOf(selected), todayIdx = colOf(todayKey);
+    cols.forEach((c, i) => {
+      if (!weekly && (c.from.getDay() === 0 || c.from.getDay() === 6)) under.append(el('rect', { class: 'g-weekend', x: L + i * colW, y: plotTop, width: colW, height: plotBottom - plotTop }));
+      if (i === selIdx) under.append(el('rect', { class: 'g-selected', x: L + i * colW, y: plotTop - 2, width: colW, height: plotBottom - plotTop + 4 }));
+    });
+    // month boundaries
+    cols.forEach((c, i) => {
+      if (i > 0 && c.from.getDate() <= (weekly ? 7 : 1) && c.from.getMonth() !== cols[i - 1].from.getMonth()) {
+        under.append(el('line', { class: 'g-month', x1: L + i * colW, x2: L + i * colW, y1: plotTop, y2: plotBottom + 6 }));
+      }
+    });
+
+    // per-column aggregates: {v, lo, hi, n} on a rank scale (metrics) or score scale
+    const agg = (vals) => vals.length ? { v: vals.reduce((a, b) => a + b, 0) / vals.length, lo: Math.min(...vals), hi: Math.max(...vals), n: vals.length } : null;
+    const drawSeries = (series, y, lineClass, ptClass, colorOf) => {
+      // series[i] = aggregate or null; band for weekly spread, line through means, points
+      if (weekly) {
+        let band = '';
+        series.forEach((a, i) => { if (a && a.hi > a.lo) band += `M${(x(i) - colW * 0.28).toFixed(1)} ${y(a.hi).toFixed(1)} h${(colW * 0.56).toFixed(1)} V${y(a.lo).toFixed(1)} h${(-colW * 0.56).toFixed(1)} Z `; });
+        if (band) marks.append(el('path', { class: 'g-band', d: band.trim(), style: `fill:${colorOf(null)}` }));
+      }
+      let d = '', prev = false;
+      series.forEach((a, i) => { if (!a) { prev = false; return; } d += (prev ? ' L' : ' M') + `${x(i).toFixed(1)} ${y(a.v).toFixed(1)}`; prev = true; });
+      if (d) marks.append(el('path', { class: 'g-line ' + lineClass, d: d.trim(), style: `stroke:${colorOf(null)}` }));
+      series.forEach((a, i) => { if (a) marks.append(el('circle', { class: 'g-pt ' + ptClass, cx: x(i), cy: y(a.v), r: weekly ? 4 : 4.5, style: `fill:${colorOf(a)}` })); });
+    };
+
+    // day score strip (every metric counts, whatever the filter says), scaled to this window
     {
       const top = TOP + HEAD, bottom = top + PLOT;
-      // scale to this month's scores, not the theoretical maximum, so the line uses the strip's height
-      let maxScore = 0;
-      for (let day = 1; day <= daysInMonth; day++) { const sc = dayScore(iso(new Date(view.y, view.m, day))); if (sc.n) maxScore = Math.max(maxScore, sc.sum); }
+      const series = cols.map(c => agg(c.keys.map(k => dayScore(k)).filter(s => s.n).map(s => s.sum)));
+      let maxScore = Math.max(0, ...series.filter(Boolean).map(a => a.hi));
       if (maxScore <= 0) maxScore = Math.max(1, state.metrics.reduce((a, m) => a + Math.max(0, ...m.options.map(o => Number(o.value) || 0)), 0));
       const stepRaw = maxScore / 4, mag = Math.pow(10, Math.floor(Math.log10(stepRaw)));
       const tick = [1, 2, 2.5, 5, 10].map(v => v * mag).find(v => v >= stepRaw) || mag;
       const yMax = Math.ceil(maxScore / tick) * tick;
-      const y = v => bottom - (v / yMax) * PLOT;
-      under.append(el('text', { class: 'g-title', x: L, y: top - 8 }, 'Day score'));
+      const y = v => bottom - (Math.min(yMax, Math.max(0, v)) / yMax) * PLOT;
+      under.append(el('text', { class: 'g-title', x: L, y: top - 8 }, weekly ? 'Day score · weekly avg' : 'Day score'));
       for (let v = 0; v <= yMax + 1e-9; v += tick) {
         under.append(el('line', { class: 'g-grid', x1: L, x2: W - R, y1: y(v), y2: y(v) }));
         under.append(el('text', { class: 'g-ylabel num', x: L - 8, y: y(v) + 3.5 }, String(Math.round(v * 100) / 100)));
       }
-      let d = '', prevLogged = false; const pts = [];
-      for (let day = 1; day <= daysInMonth; day++) {
-        const sc = dayScore(iso(new Date(view.y, view.m, day)));
-        if (!sc.n) { prevLogged = false; continue; }
-        const px = x(day), py = y(Math.min(yMax, Math.max(0, sc.sum)));
-        d += (prevLogged ? ' L' : ' M') + `${px.toFixed(1)} ${py.toFixed(1)}`;
-        prevLogged = true; pts.push({ px, py });
-      }
-      if (d) marks.append(el('path', { class: 'g-line g-score-line', d: d.trim() }));
-      pts.forEach(p => marks.append(el('circle', { class: 'g-pt g-score-pt', cx: p.px, cy: p.py, r: 4.5 })));
+      drawSeries(series, y, 'g-score-line', 'g-score-pt', () => 'var(--accent)');
     }
 
     shown.forEach((m, i) => {
@@ -527,66 +596,98 @@
       const opts = [...m.options].sort((a, b) => (Number(a.value) || 0) - (Number(b.value) || 0));
       const rank = new Map(opts.map((o, k) => [o.id, k]));
       const k = opts.length;
-      const y = r => k > 1 ? bottom - r * (PLOT / (k - 1)) : (top + bottom) / 2;
-      under.append(el('text', { class: 'g-title', x: L, y: top - 8 }, m.name));
+      const y = v => k > 1 ? bottom - v * (PLOT / (k - 1)) : (top + bottom) / 2;
+      under.append(el('text', { class: 'g-title', x: L, y: top - 8 }, m.name + (weekly ? ' · weekly avg' : '')));
       const step = k > 1 ? PLOT / (k - 1) : PLOT;
-      opts.forEach((o, r) => {
-        under.append(el('line', { class: 'g-grid', x1: L, x2: W - R, y1: y(r), y2: y(r) }));
-        if (step >= 13 || r === 0 || r === k - 1) under.append(el('text', { class: 'g-ylabel', x: L - 8, y: y(r) + 3.5 }, o.label));
+      opts.forEach((o, ri) => {
+        under.append(el('line', { class: 'g-grid', x1: L, x2: W - R, y1: y(ri), y2: y(ri) }));
+        if (step >= 13 || ri === 0 || ri === k - 1) under.append(el('text', { class: 'g-ylabel', x: L - 8, y: y(ri) + 3.5 }, o.label));
       });
       const mid = opts[Math.floor((k - 1) / 2)];
-      const lineColor = mid ? mid.color : 'currentColor';
-      let d = '', prevLogged = false;
-      const pts = [];
-      for (let day = 1; day <= daysInMonth; day++) {
-        const e = state.entries[iso(new Date(view.y, view.m, day))] || {};
-        const o = e[m.id] && optionOf(m, e[m.id]);
-        if (!o || !rank.has(o.id)) { prevLogged = false; continue; }
-        const px = x(day), py = y(rank.get(o.id));
-        d += (prevLogged ? ' L' : ' M') + `${px.toFixed(1)} ${py.toFixed(1)}`;
-        prevLogged = true;
-        pts.push({ px, py, o });
-      }
-      if (d) marks.append(el('path', { class: 'g-line', d: d.trim(), style: `stroke:${lineColor}` }));
-      pts.forEach(p => marks.append(el('circle', { class: 'g-pt', cx: p.px, cy: p.py, r: 4.5, style: `fill:${p.o.color}` })));
+      const series = cols.map(c => agg(c.keys.map(key => { const e = state.entries[key] || {}; const o = e[m.id] && optionOf(m, e[m.id]); return o && rank.has(o.id) ? rank.get(o.id) : null; }).filter(v => v !== null)));
+      const colorOf = a => a && !weekly ? opts[Math.round(a.v)].color : (mid ? mid.color : 'currentColor');
+      drawSeries(series, y, '', '', colorOf);
     });
 
-    // shared day axis
-    const axisY = plotBottom + 18;
-    const every = colW >= 20 ? 1 : colW >= 11 ? 2 : 5;
-    for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(view.y, view.m, d), key = iso(date), isToday = key === iso(today);
-      if (isToday) over.append(el('rect', { class: 'g-today', x: x(d) - 9, y: axisY - 12, width: 18, height: 16 }));
-      if (d % every === 0 || d === 1 || isToday) {
-        over.append(el('text', { class: 'g-day' + (isToday ? ' today' : '') + (key === selected ? ' sel' : ''), x: x(d), y: axisY }, d));
+    // axis: dates on one row, month names on another; today marked
+    const axisY = plotBottom + 18, monthY = plotBottom + 36;
+    const every = colW >= 20 ? 1 : colW >= 11 ? 2 : colW >= 6 ? 5 : 10;
+    let lastMonthLabelEnd = -Infinity;
+    cols.forEach((c, i) => {
+      const isToday = i === todayIdx;
+      if (!weekly) {
+        // daily: day numbers (thinned to the column width), today boxed
+        const show = c.from.getDate() % every === 0 || c.from.getDate() === 1 || isToday;
+        if (isToday) over.append(el('rect', { class: 'g-today', x: x(i) - 9, y: axisY - 12, width: 18, height: 16 }));
+        if (show) over.append(el('text', { class: 'g-day' + (isToday ? ' today' : '') + (i === selIdx ? ' sel' : ''), x: x(i), y: axisY }, String(c.from.getDate())));
+      } else if (isToday) {
+        over.append(el('rect', { class: 'g-today', x: x(i) - 3, y: axisY - 10, width: 6, height: 6 }));   // weekly: a small tick for this week
       }
-    }
+      // month names where a month begins (weekly: the week containing the 1st), skipping any that would collide
+      const monthStartsHere = i === 0 || (weekly ? c.keys.some(k => k.endsWith('-01')) && !(i > 0 && cols[i - 1].keys.some(k => k.endsWith('-01'))) : c.from.getDate() === 1);
+      if (monthStartsHere) {
+        const d = weekly ? fromIso(c.keys.find(k => k.endsWith('-01')) || c.keys[0]) : c.from;
+        const withYear = i === 0 || d.getMonth() === 0;
+        const mLabel = withYear ? `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getFullYear()}` : MONTHS[d.getMonth()].slice(0, 3);
+        const lx = L + i * colW + 3, lw = mLabel.length * 6.8;
+        if (lx >= lastMonthLabelEnd + 6) { over.append(el('text', { class: 'g-monthlabel', x: lx, y: weekly ? axisY : monthY }, mLabel)); lastMonthLabelEnd = lx + lw; }
+      }
+    });
+
     // hover crosshair + click-to-select columns
     const cross = el('line', { class: 'g-cross', y1: plotTop, y2: plotBottom, x1: -10, x2: -10 });
     over.append(cross);
-    for (let d = 1; d <= daysInMonth; d++) {
-      const key = iso(new Date(view.y, view.m, d));
-      const hit = el('rect', { class: 'g-hit', x: L + (d - 1) * colW, y: plotTop, width: colW, height: plotBottom - plotTop + AXIS });
-      hit.addEventListener('mouseenter', ev => { cross.setAttribute('x1', x(d)); cross.setAttribute('x2', x(d)); showGraphTip(key, d, ev); });
+    cols.forEach((c, i) => {
+      const hit = el('rect', { class: 'g-hit', x: L + i * colW, y: plotTop, width: colW, height: plotBottom - plotTop + AXIS });
+      hit.addEventListener('mouseenter', ev => { cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); showGraphTip(c, weekly, ev); });
       hit.addEventListener('mousemove', ev => placeGraphTip(ev));
       hit.addEventListener('mouseleave', () => { cross.setAttribute('x1', -10); cross.setAttribute('x2', -10); hideGraphTip(); });
-      hit.addEventListener('click', () => { selected = key; renderCalendar(); renderInspector(); });
+      hit.addEventListener('click', () => {
+        // daily: that day. weekly: the week's last logged day, else its last day in range
+        const logged = c.keys.filter(k => state.entries[k] && state.metrics.some(m => state.entries[k][m.id]));
+        selected = weekly ? (logged[logged.length - 1] || c.keys[c.keys.length - 1]) : c.keys[0];
+        const d = fromIso(selected); view = { y: d.getFullYear(), m: d.getMonth() };   // keep the calendar in step
+        renderCalendar(); renderInspector();
+      });
       over.append(hit);
+    });
+
+    // scroll wrapper + pinned gutter (titles and y labels repeated on an opaque strip)
+    const scroll = document.createElement('div'); scroll.className = 'graph-scroll' + (fits ? '' : ' scrolls');
+    scroll.append(svg); host.append(scroll);
+    if (!fits) {
+      const gutter = el('svg', { class: 'graph-gutter', viewBox: `0 0 ${L} ${H}`, width: L, height: H, 'aria-hidden': 'true' });
+      gutter.append(el('rect', { class: 'g-gutter-bg', x: 0, y: 0, width: L - 2, height: H }));
+      under.querySelectorAll('.g-title, .g-ylabel').forEach(t => {
+        const c = t.cloneNode(true);
+        if (c.classList.contains('g-title')) { c.setAttribute('x', 8); c.textContent = c.textContent.replace(' · weekly avg', ''); }
+        gutter.append(c);
+      });
+      host.append(gutter);
+      // open on the most recent columns (today / the selected day) unless the user has scrolled before
+      const target = selIdx >= 0 ? selIdx : (todayIdx >= 0 ? todayIdx : N - 1);
+      scroll.scrollLeft = Math.max(0, L + (target + 1) * colW + R - scroll.clientWidth);
     }
-    host.append(svg);
   }
-  function showGraphTip(key, day, ev) {
+  function showGraphTip(col, weekly, ev) {
     if (!graphTip) { graphTip = document.createElement('div'); graphTip.className = 'graph-tip'; }
-    const date = new Date(view.y, view.m, day);
-    const e = state.entries[key] || {};
+    const title = weekly ? `Week of ${shortDate(col.from)} – ${shortDate(col.to)}` : `${DOW[col.from.getDay()].slice(0, 3)} ${longDate(col.from)}`;
+    const scores = col.keys.map(k => dayScore(k)).filter(s => s.n).map(s => s.sum);
+    const scoreTxt = !scores.length ? '—' : weekly ? `${(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)} avg · ${scores.length}d` : String(scores[0]);
     const rows = visibleMetrics().map(m => {
-      const o = e[m.id] && optionOf(m, e[m.id]);
-      return `<div class="graph-tip-row"><i style="background:${o ? o.color : 'transparent'};${o ? '' : 'border:1px solid var(--line-strong)'}"></i><span>${esc(m.name)}</span><b>${o ? esc(o.label) : '—'}</b></div>`;
+      const opts = [...m.options].sort((a, b) => (Number(a.value) || 0) - (Number(b.value) || 0));
+      const rank = new Map(opts.map((o, k) => [o.id, k]));
+      const vals = col.keys.map(k => { const e = state.entries[k] || {}; const o = e[m.id] && optionOf(m, e[m.id]); return o && rank.has(o.id) ? rank.get(o.id) : null; }).filter(v => v !== null);
+      let txt = '—', color = 'transparent';
+      if (vals.length) {
+        const mean = vals.reduce((a, b) => a + b, 0) / vals.length; const near = opts[Math.round(mean)];
+        color = near.color;
+        txt = weekly ? `≈ ${near.label} · ${vals.length}d` : near.label;
+      }
+      return `<div class="graph-tip-row"><i style="background:${color};${vals.length ? '' : 'border:1px solid var(--line-strong)'}"></i><span>${esc(m.name)}</span><b>${esc(txt)}</b></div>`;
     }).join('');
-    const sc = dayScore(key);
-    graphTip.innerHTML = `<div class="graph-tip-date">${DOW[date.getDay()].slice(0, 3)} ${date.getDate()} ${MONTHS[date.getMonth()].slice(0, 3)}</div>` +
-      `<div class="graph-tip-row score"><i></i><span>Day score</span><b>${sc.n ? sc.sum : '—'}</b></div>${rows}`;
-    document.body.append(graphTip);   // fixed to the viewport, so it follows the pointer however far the pane is scrolled
+    graphTip.innerHTML = `<div class="graph-tip-date">${esc(title)}</div><div class="graph-tip-row score"><i></i><span>Day score</span><b>${esc(scoreTxt)}</b></div>${rows}`;
+    document.body.append(graphTip);
     placeGraphTip(ev);
   }
   function placeGraphTip(ev) {
@@ -772,6 +873,37 @@
   document.getElementById('prev').onclick = () => { view.m--; if (view.m < 0) { view.m = 11; view.y--; } renderCalendar(); };
   document.getElementById('next').onclick = () => { view.m++; if (view.m > 11) { view.m = 0; view.y++; } renderCalendar(); };
   document.getElementById('today-btn').onclick = () => { view = { y: today.getFullYear(), m: today.getMonth() }; selected = iso(today); renderCalendar(); renderInspector(); };
+
+  // ---------- graph controls ----------
+  function renderGraphControls(show) {
+    const box = document.getElementById('graph-controls'); if (!box) return;
+    box.hidden = !show; if (!show) return;
+    const g = state.settings.graph, r = graphRange();
+    box.querySelectorAll('[data-period]').forEach(b => { const on = b.dataset.period === g.period; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+    box.querySelectorAll('[data-res]').forEach(b => { const on = b.dataset.res === r.res; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+    const custom = document.getElementById('custom-range'); custom.hidden = g.period !== 'custom';
+    const fromI = document.getElementById('range-from'), toI = document.getElementById('range-to');
+    if (document.activeElement !== fromI) fromI.value = iso(r.from);
+    if (document.activeElement !== toI) toI.value = iso(r.to);
+  }
+  {
+    const box = document.getElementById('graph-controls');
+    if (box) {
+      box.querySelectorAll('[data-period]').forEach(b => b.onclick = () => {
+        const g = state.settings.graph, r = graphRange();
+        g.period = b.dataset.period; g.res = 'auto';
+        if (g.period === 'custom') { g.from = iso(r.from); g.customTo = iso(r.to); }
+        save(); renderCalendar();
+      });
+      box.querySelectorAll('[data-res]').forEach(b => b.onclick = () => { state.settings.graph.res = b.dataset.res; save(); renderCalendar(); });
+      const onRange = () => {
+        const g = state.settings.graph, f = document.getElementById('range-from').value, t = document.getElementById('range-to').value;
+        if (!f || !t) return;
+        g.period = 'custom'; g.from = f; g.customTo = t; g.res = 'auto'; save(); renderCalendar();
+      };
+      document.getElementById('range-from').onchange = onRange; document.getElementById('range-to').onchange = onRange;
+    }
+  }
   // ---------- metrics pane collapse ----------
   const metricsToggle = document.getElementById('metrics-toggle');   // a skin may omit it
   function applyMetricsCollapsed(collapsed, persist) {
@@ -808,20 +940,25 @@
       const entry = el.closest('.entry'); if (entry) rowScroll.set(entry.dataset.m, el.scrollLeft);
       return;
     }
-    closePicker(); closeMenus(); hideGraphTip();                              // panes scroll independently
+    closePicker(); hideGraphTip();                                            // panes scroll independently
+    $$('.menu:not(.filter-menu)').forEach(m => m.remove());                   // the filter menu stays open while its choices re-render the view
   }, true);
 
   document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && document.querySelector('.menu')) {   // menus close from anywhere, including a focused checkbox
+      closeMenus(); const f = document.getElementById('metric-filter'); if (f && ev.target.closest && ev.target.closest('.filter-menu')) f.focus(); else if (themeToggle && ev.target.closest && ev.target.closest('.theme-menu')) themeToggle.focus();
+      ev.preventDefault(); return;
+    }
     const t = ev.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     if ((ev.metaKey || ev.ctrlKey) && ev.shiftKey && ev.key.toLowerCase() === 'l') {
       if (themeToggle) { ev.preventDefault(); applyTheme(effectiveTheme() === 'dark' ? 'light' : 'dark'); }
       return;
     }
-    if (ev.key === 'Escape' && document.querySelector('.menu')) { closeMenus(); if (themeToggle) themeToggle.focus(); return; }
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
-    if (ev.key === 'ArrowLeft') { document.getElementById('prev').click(); ev.preventDefault(); }
-    else if (ev.key === 'ArrowRight') { document.getElementById('next').click(); ev.preventDefault(); }
-    else if (ev.key === 't' || ev.key === 'T') { document.getElementById('today-btn').click(); }
+    const calMode = state.settings.view !== 'graph';
+    if (ev.key === 'ArrowLeft' && calMode) { document.getElementById('prev').click(); ev.preventDefault(); }
+    else if (ev.key === 'ArrowRight' && calMode) { document.getElementById('next').click(); ev.preventDefault(); }
+    else if ((ev.key === 't' || ev.key === 'T') && calMode) { document.getElementById('today-btn').click(); }
     else if (ev.key === 'g' || ev.key === 'G') { setView(state.settings.view === 'graph' ? 'calendar' : 'graph'); }
   });
 

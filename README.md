@@ -15,7 +15,7 @@ Then open http://localhost:8080.
 ## Alternative UI
 
 `tactical.html` is a second front-end over the same data and engine: a phosphor-green CRT look with
-HUD readouts on the calendar scope, a TARGET DAY panel and a status bar (`css/tactical.css`,
+HUD readouts on the calendar scope, a TARGET DAY panel and a status bar (no clock, no link back) (`css/tactical.css`,
 `js/tactical.js`). Both UIs share `js/app.js`, so anything logged in one shows up in the other.
 
 ## Structure
@@ -35,13 +35,20 @@ The **day score** is the sum of the values of the options logged that day.
 
 ## Views
 
-The switch above the calendar toggles **Calendar** and **Graph** (`G` also toggles). The graph draws a **Day score**
-strip first (always present, outside the metric filter, scaled from 0 to the month's highest score), then
-one strip per visible metric on a shared day axis for the month: each logged day is a point in its option's
-colour, placed by the option's rank within the metric (lowest value at the bottom), joined by a line in
-the metric's middle colour and broken where days are unlogged. Weekends are shaded, today and the selected
-day are marked, hovering a day shows every visible metric's option, and clicking a day selects it for day
-entry. The metrics menu filters both views. The active view is kept in `settings.view`.
+The top-right bar holds every control: the **Calendar** / **Graph** switch (`G` also toggles). The calendar shows one
+month. The graph has its own window: **30d / 90d / 180d / 1y** end on today, **All** spans the whole log, and
+**Custom** takes a from/to. The month arrows and Today belong to the calendar and are hidden in Graph view.
+Resolution is **Daily** or **Weekly** (auto: weekly above 180 days). Daily columns that don't fit the pane
+scroll sideways behind a pinned label gutter, opening on the selected day.
+
+Each graph strip plots one series on a shared date axis with month names at month boundaries: the **Day
+score** first (always present, outside the metric filter, scaled to the window), then one strip per visible
+metric. Daily: each logged day is a point in its option's colour, placed by the option's rank within the
+metric (lowest value at the bottom), joined by a line in the metric's middle colour and broken where days
+are unlogged; weekends are shaded. Weekly: a point at the week's average rank or score with a faint band
+from its lowest to highest day. Hovering a column shows every visible metric's value; clicking selects
+that day (for a week, its last logged day) and moves the calendar to it. The metrics menu filters both
+views. View and window are kept in `settings.view` and `settings.graph`.
 
 ## Data
 
@@ -53,7 +60,8 @@ Everything the app persists lives in a single `localStorage` object under `corre
   metrics:  [{ id, name, options: [{ id, label, color, value }] }],
   entries:  { "YYYY-MM-DD": { metricId: optionId } },
   settings: { theme: "light" | "dark" | "system", metricsCollapsed: bool,
-              visible: null | [metricId], view: "calendar" | "graph" }
+              visible: null | [metricId], view: "calendar" | "graph",
+              graph: { period, to, from, customTo, res } }
 }
 ```
 
@@ -65,13 +73,13 @@ version 2; version 3 appends the Stress metric once to stores that lack it.
 
 ## Theme
 
-The theme button in the top bar opens a Light / Dark / System menu. System follows the OS setting live.
+The theme button at the end of the top bar opens a Light / Dark / System menu. System follows the OS setting live.
 `⌘⇧L` toggles light and dark directly. The choice is stored in `settings.theme` of the app's `localStorage` object.
 The tactical UI ignores it and always renders dark.
 
 ## Metric filter
 
-The button above the calendar ("All metrics" by default) opens a checklist: All at the top, then every
+The metrics button in the top bar ("All metrics" by default) opens a checklist: All at the top, then every
 metric. Unchecked metrics lose their lane in each day cell (and their strip in the graph), so two or three
 metrics can be compared across days without the others in the way; the day score in each cell still sums
 every metric. Day entry still lists
@@ -80,7 +88,7 @@ appear automatically).
 
 ## Keyboard
 
-`←` / `→` previous and next month, `T` today, `G` graph/calendar, `⌘⇧L` toggle light/dark. Click a day to select it, then click option chips to log. A metric with nothing logged on the selected
+`←` / `→` previous and next month and `T` today (calendar view), `G` graph/calendar, `⌘⇧L` toggle light/dark. Click a day to select it, then click option chips to log. A metric with nothing logged on the selected
 day rests its chip row on the most recent earlier value (up to a week back), since a new day usually
 resembles the one before; nothing is logged until a chip is tapped. Edit on a metric card reveals its options plus
 + Option, Duplicate (copies the metric and its options, placed right after it) and Delete. The < button in the

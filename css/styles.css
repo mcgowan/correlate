@@ -97,8 +97,8 @@ button { cursor: pointer; }
 .wordmark .mark i:nth-child(2) { opacity: .55; }
 .wordmark .mark i:nth-child(3) { opacity: .35; }
 .wordmark .mark i:nth-child(4) { opacity: .8; }
-.tagline { color: var(--muted); font-size: 13px; }
-.monthnav { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.nav { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px 14px; flex-wrap: wrap; }
+.monthnav { display: flex; align-items: center; gap: 6px; }
 .monthnav h2 { margin: 0 6px; font-size: 16px; font-weight: 600; min-width: 150px; text-align: center; }
 .btn {
   border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
@@ -245,7 +245,6 @@ h3 { margin: 0; font-size: 14px; font-weight: 600; }
 
 /* ---------- Calendar (center) ---------- */
 .pane.center { padding: 18px 22px 40px; }
-.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .filter-btn::after { content: ''; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 4px solid currentColor; margin-left: 2px; opacity: .7; }
 .filter-btn.filtered { border-color: var(--accent); color: var(--accent); }
 .filter-menu { min-width: 200px; padding: 6px; }
@@ -282,11 +281,23 @@ h3 { margin: 0; font-size: 14px; font-weight: 600; }
 .lane.dim { color: #171a21; text-shadow: none; }
 
 /* ---------- Graph view ---------- */
-.view-switch { display: inline-flex; }
-.view-switch .btn + .btn { margin-left: -1px; }
-.view-switch .btn.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); position: relative; z-index: 1; }
+.view-switch, .seg { display: inline-flex; }
+.view-switch .btn + .btn, .seg .btn + .btn { margin-left: -1px; }
+.view-switch .btn.on, .seg .btn.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); position: relative; z-index: 1; }
+.graph-controls { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.custom-range { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.custom-range input { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); padding: 3px 6px; font-size: 12px; font-family: var(--mono); }
+.graph-scroll { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.graph-scroll::-webkit-scrollbar { height: 8px; }
+.graph-scroll::-webkit-scrollbar-thumb { background: var(--line-strong); }
+.graph-gutter { position: absolute; left: 0; top: 0; pointer-events: none; }
+.g-gutter-bg { fill: var(--ground); }
+.g-band { opacity: .22; }
+.g-month { stroke: var(--line-strong); stroke-width: 1; shape-rendering: crispEdges; }
+.g-monthlabel { font-size: 11px; font-weight: 600; fill: var(--ink-2); letter-spacing: .04em; pointer-events: none; }
 .graph { position: relative; }
-.graph-svg { display: block; width: 100%; height: auto; font-family: var(--sans); }
+.graph-svg { display: block; height: auto; font-family: var(--sans); }
+.graph-scroll:not(.scrolls) .graph-svg { width: 100%; }
 .g-weekend { fill: var(--surface-2); opacity: .55; }
 .g-selected { fill: var(--accent-soft); }
 .g-grid { stroke: var(--line); stroke-width: 1; shape-rendering: crispEdges; }
@@ -354,6 +365,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
 @media (max-width: 1080px) {
+  .nav { margin-left: 0; justify-content: flex-start; width: 100%; }
   html, body { height: auto; }
   body { display: block; }
   .app { grid-template-columns: 1fr; }
@@ -368,5 +380,4 @@ h3 { margin: 0; font-size: 14px; font-weight: 600; }
   .lane { font-size: 0; height: 10px; }
   .day-head .score { display: none; }
   .monthnav h2 { min-width: 0; font-size: 14px; }
-  .tagline { display: none; }
 }

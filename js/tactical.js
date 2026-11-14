@@ -1,5 +1,5 @@
 /* CORRELATE — tactical chrome on top of the shared engine.
- * Loaded after app.js. Drives the clock, the four HUD readouts on the scope, the TARGET DAY
+ * Loaded after app.js. Drives the four HUD readouts on the scope, the TARGET DAY
  * lock status and the status bar by reading the window.Correlate hook on every
  * 'correlate:render' event. It never mutates metric or entry data.
  */
@@ -7,18 +7,6 @@
   'use strict';
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-  const pad2 = n => String(n).padStart(2, '0');
-
-  /* ---------- clock ---------- */
-  function tickClock() {
-    const d = new Date();
-    const time = d.toLocaleTimeString('en-US', { hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const wd = d.toLocaleDateString('en-US', { weekday: 'short' });
-    const mon = d.toLocaleDateString('en-US', { month: 'short' });
-    $$('.js-clock').forEach(e => { e.textContent = time; });
-    $$('.js-date').forEach(e => { e.textContent = `${wd} ${pad2(d.getDate())} ${mon} ${d.getFullYear()}`.toUpperCase(); });
-  }
-  tickClock(); setInterval(tickClock, 1000);
 
   /* ---------- readouts ---------- */
   const hasEntry = (state, key) => {

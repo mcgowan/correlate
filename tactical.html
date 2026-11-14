@@ -19,14 +19,34 @@
       <span class="wordmark">CORRELATE</span>
       <span class="sub">AN/MET-1 · TACTICAL METRIC SCOPE</span>
     </div>
-    <div class="monthnav">
-      <button class="rng rng--sm" id="prev" aria-label="Previous month">&#9664; PREV</button>
-      <h2 id="month-title">September 2026</h2>
-      <button class="rng rng--sm" id="next" aria-label="Next month">NEXT &#9654;</button>
-      <button class="rng rng--sm rng--on" id="today-btn">TODAY</button>
-      <a class="rng rng--sm" href="index.html" title="Switch to the standard interface">STD UI</a>
-      <span class="clock-wrap"><span class="clock js-clock">--:--:--</span><span class="date js-date">--- -- --- ----</span></span>
-    </div>
+    <nav class="nav" aria-label="Views and navigation">
+      <div class="view-switch" id="view-switch" role="tablist" aria-label="View">
+            <button type="button" class="rng rng--sm" data-view="calendar" role="tab" aria-selected="true">Calendar</button>
+            <button type="button" class="rng rng--sm" data-view="graph" role="tab" aria-selected="false">Graph</button>
+          </div>
+      <div class="graph-controls" id="graph-controls" hidden>
+        <div class="seg" id="period-switch" role="group" aria-label="Period">
+          <button type="button" class="rng rng--sm" data-period="30d" aria-pressed="false">30d</button>
+          <button type="button" class="rng rng--sm" data-period="90d" aria-pressed="false">90d</button>
+          <button type="button" class="rng rng--sm" data-period="180d" aria-pressed="false">180d</button>
+          <button type="button" class="rng rng--sm" data-period="1y" aria-pressed="false">1y</button>
+          <button type="button" class="rng rng--sm" data-period="all" aria-pressed="false">All</button>
+          <button type="button" class="rng rng--sm" data-period="custom" aria-pressed="false">Custom</button>
+        </div>
+        <span class="custom-range" id="custom-range" hidden><input type="date" id="range-from" aria-label="From"><span class="to">to</span><input type="date" id="range-to" aria-label="To"></span>
+        <div class="seg" id="res-switch" role="group" aria-label="Resolution">
+          <button type="button" class="rng rng--sm" data-res="daily" aria-pressed="false">Daily</button>
+          <button type="button" class="rng rng--sm" data-res="weekly" aria-pressed="false">Weekly</button>
+        </div>
+      </div>
+      <div class="monthnav">
+        <button class="rng rng--sm" id="prev" aria-label="Previous">&#9664; PREV</button>
+        <h2 id="month-title">September 2026</h2>
+        <button class="rng rng--sm" id="next" aria-label="Next">NEXT &#9654;</button>
+        <button class="rng rng--sm rng--on" id="today-btn">TODAY</button>
+      </div>
+      <button class="rng rng--sm filter-btn" id="metric-filter" type="button" aria-haspopup="menu" aria-expanded="false" title="Choose which metrics to show">All metrics</button>
+    </nav>
   </header>
 
   <main class="app">
@@ -49,13 +69,6 @@
         <div class="hud hud--tr">SCORE<b class="js-hud-score">—</b><span>MONTH AVG · PER LOGGED DAY</span></div>
         <div class="hud hud--bl">LINK<b class="js-hud-link">SYNCED</b><span>LOCAL STORE</span></div>
         <div class="hud hud--br">LOCK<b class="js-hud-lock hud__red">NONE</b><span class="js-hud-lock-sub">NO TARGET</span></div>
-        <div class="cal-head">
-          <div class="view-switch" id="view-switch" role="tablist" aria-label="View">
-            <button type="button" class="rng rng--sm" data-view="calendar" role="tab" aria-selected="true">Calendar</button>
-            <button type="button" class="rng rng--sm" data-view="graph" role="tab" aria-selected="false">Graph</button>
-          </div>
-          <button class="rng rng--sm filter-btn" id="metric-filter" type="button" aria-haspopup="menu" aria-expanded="false" title="Choose which metrics to show">All metrics</button>
-        </div>
         <div class="dow"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
         <div class="grid" id="grid"></div>
         <div class="graph" id="graph" hidden></div>

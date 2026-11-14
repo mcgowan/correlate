@@ -14,14 +14,35 @@
 
 <header class="topbar">
   <div class="wordmark"><span class="mark"><i></i><i></i><i></i><i></i></span>Correlate</div>
-  <span class="tagline">Log a few things daily. See what moves together.</span>
-  <div class="monthnav">
-    <button class="btn icon" id="prev" aria-label="Previous month">&#8592;</button>
-    <h2 id="month-title">September 2026</h2>
-    <button class="btn icon" id="next" aria-label="Next month">&#8594;</button>
-    <button class="btn" id="today-btn">Today</button>
+  <nav class="nav" aria-label="Views and navigation">
+    <div class="view-switch" id="view-switch" role="tablist" aria-label="View">
+        <button type="button" class="btn small" data-view="calendar" role="tab" aria-selected="true">Calendar</button>
+        <button type="button" class="btn small" data-view="graph" role="tab" aria-selected="false">Graph</button>
+      </div>
+    <div class="graph-controls" id="graph-controls" hidden>
+        <div class="seg" id="period-switch" role="group" aria-label="Period">
+          <button type="button" class="btn small" data-period="30d" aria-pressed="false">30d</button>
+          <button type="button" class="btn small" data-period="90d" aria-pressed="false">90d</button>
+          <button type="button" class="btn small" data-period="180d" aria-pressed="false">180d</button>
+          <button type="button" class="btn small" data-period="1y" aria-pressed="false">1y</button>
+          <button type="button" class="btn small" data-period="all" aria-pressed="false">All</button>
+          <button type="button" class="btn small" data-period="custom" aria-pressed="false">Custom</button>
+        </div>
+        <span class="custom-range" id="custom-range" hidden><input type="date" id="range-from" aria-label="From"><span class="to">to</span><input type="date" id="range-to" aria-label="To"></span>
+        <div class="seg" id="res-switch" role="group" aria-label="Resolution">
+          <button type="button" class="btn small" data-res="daily" aria-pressed="false">Daily</button>
+          <button type="button" class="btn small" data-res="weekly" aria-pressed="false">Weekly</button>
+        </div>
+      </div>
+    <div class="monthnav">
+      <button class="btn icon" id="prev" aria-label="Previous">&#8592;</button>
+      <h2 id="month-title">September 2026</h2>
+      <button class="btn icon" id="next" aria-label="Next">&#8594;</button>
+      <button class="btn" id="today-btn">Today</button>
+    </div>
+    <button class="btn small filter-btn" id="metric-filter" type="button" aria-haspopup="menu" aria-expanded="false" title="Choose which metrics to show">All metrics</button>
     <button class="icon-btn theme-toggle" id="theme-toggle" type="button" title="Toggle theme" data-icon="sun"></button>
-  </div>
+  </nav>
 </header>
 
 <main class="app">
@@ -37,13 +58,6 @@
   </aside>
 
   <section class="pane center">
-    <div class="cal-head">
-      <div class="view-switch" id="view-switch" role="tablist" aria-label="View">
-        <button type="button" class="btn small" data-view="calendar" role="tab" aria-selected="true">Calendar</button>
-        <button type="button" class="btn small" data-view="graph" role="tab" aria-selected="false">Graph</button>
-      </div>
-      <button class="btn small filter-btn" id="metric-filter" type="button" aria-haspopup="menu" aria-expanded="false" title="Choose which metrics to show">All metrics</button>
-    </div>
     <div class="dow"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
     <div class="grid" id="grid"></div>
     <div class="graph" id="graph" hidden></div>
