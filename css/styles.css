@@ -331,7 +331,9 @@ h3 { margin: 0; font-size: 14px; font-weight: 600; }
 .insp-score { display: flex; align-items: baseline; gap: 6px; margin: 14px 0 18px; padding: 10px 12px; border-radius: 0; background: var(--surface-2); }
 .insp-score .v { font-family: var(--mono); font-size: 22px; font-weight: 500; }
 .insp-score .l { color: var(--muted); font-size: 12px; }
-.entry { padding: 10px 0; border-top: 1px solid var(--line); }
+.entry { padding: 10px 0; border-top: 1px solid var(--line); scroll-margin: 12px; }
+.entry.flash { animation: entry-flash 1.1s ease-out; }
+@keyframes entry-flash { 0% { box-shadow: inset 4px 0 0 var(--accent); background: var(--accent-soft); } 100% { box-shadow: inset 4px 0 0 transparent; background: transparent; } }
 .entry .row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
 .entry .row .cur { color: var(--muted); font-size: 12px; }
 /* one horizontally scrolling row of chips per metric; app.js recenters it on the selected option */

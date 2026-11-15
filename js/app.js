@@ -452,11 +452,14 @@
       const e = state.entries[key] || {};
       const lanes = shown.map(m => {
         const o = e[m.id] && optionOf(m, e[m.id]);
-        if (!o) return `<div class="lane empty" title="${esc(m.name)}: not logged">&nbsp;</div>`;
-        return `<div class="lane${isLight(o.color) ? ' dim' : ''}" style="--c:${o.color}" title="${esc(m.name)}: ${esc(o.label)} (${o.value})">${esc(o.label)}</div>`;
+        if (!o) return `<div class="lane empty" data-m="${m.id}" title="${esc(m.name)}: not logged">&nbsp;</div>`;
+        return `<div class="lane${isLight(o.color) ? ' dim' : ''}" data-m="${m.id}" style="--c:${o.color}" title="${esc(m.name)}: ${esc(o.label)} (${o.value})">${esc(o.label)}</div>`;
       }).join('');
       cell.innerHTML = `<div class="day-head"><span class="d num">${d}</span><span class="score num">${sc.n ? sc.sum : ''}</span></div><div class="lanes">${lanes}</div>`;
-      cell.onclick = () => { selected = key; renderCalendar(); renderInspector(); };
+      cell.onclick = ev => {
+        selected = key; renderCalendar(); renderInspector();
+        const lane = ev.target.closest('.lane'); if (lane) revealEntry(lane.dataset.m);   // a lane click also brings that metric's selector into view
+      };
       grid.appendChild(cell);
     }
     emit();
@@ -642,12 +645,16 @@
       hit.addEventListener('mouseenter', ev => { cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); showGraphTip(c, weekly, ev); });
       hit.addEventListener('mousemove', ev => placeGraphTip(ev));
       hit.addEventListener('mouseleave', () => { cross.setAttribute('x1', -10); cross.setAttribute('x2', -10); hideGraphTip(); });
-      hit.addEventListener('click', () => {
+      hit.addEventListener('click', ev => {
         // daily: that day. weekly: the week's last logged day, else its last day in range
         const logged = c.keys.filter(k => state.entries[k] && state.metrics.some(m => state.entries[k][m.id]));
         selected = weekly ? (logged[logged.length - 1] || c.keys[c.keys.length - 1]) : c.keys[0];
         const d = fromIso(selected); view = { y: d.getFullYear(), m: d.getMonth() };   // keep the calendar in step
+        // which strip was clicked? strip 0 is the day score; the rest map to the visible metrics
+        const svgY = ev.clientY - svg.getBoundingClientRect().top;
+        const strip = Math.floor((svgY - TOP) / rowH);
         renderCalendar(); renderInspector();
+        if (strip >= 1 && strip <= shown.length) revealEntry(shown[strip - 1].id);
       });
       over.append(hit);
     });
@@ -716,6 +723,7 @@
   }
   function renderInspector() {
     const host = document.getElementById('inspector');
+    host.querySelectorAll('.entry').forEach(en => { const r = en.querySelector('.chips'); if (r) rowScroll.set(en.dataset.m, r.scrollLeft); });   // remember row positions before rebuilding
     const date = fromIso(selected);
     const e = state.entries[selected] || {};
     const sc = dayScore(selected);
@@ -742,7 +750,8 @@
       btn.onclick = () => {
         const mid = btn.dataset.m, oid = btn.dataset.o;
         const day = state.entries[selected] || (state.entries[selected] = {});
-        if (day[mid] === oid) delete day[mid]; else day[mid] = oid;
+        if (day[mid] === oid) { delete day[mid]; holdRow = mid; }   // unlogging: leave the row where it is
+        else day[mid] = oid;
         save(); renderCalendar(); renderInspector();
       };
     });
@@ -756,6 +765,14 @@
   // browser clamps to [0, max], so first/last/near-edge options park at the ends. Rows that fit stay put.
   const rowScroll = new Map();
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  // scroll the day-entry panel so a metric's row is in view, and flash it briefly
+  function revealEntry(metricId) {
+    const entry = document.querySelector(`#inspector .entry[data-m="${metricId}"]`); if (!entry) return;
+    entry.scrollIntoView({ block: 'center', behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+    entry.classList.remove('flash'); void entry.offsetWidth; entry.classList.add('flash');
+    entry.addEventListener('animationend', () => entry.classList.remove('flash'), { once: true });
+  }
+  let holdRow = null;   // metric id whose row should keep its scroll position through the next render
   function centreChips() {
     document.querySelectorAll('#inspector .entry').forEach(entry => {
       const row = entry.querySelector('.chips'); if (!row) return;
@@ -763,6 +780,7 @@
       row.classList.toggle('fits', fits);
       if (fits) { row.scrollLeft = 0; return; }
       const saved = rowScroll.get(entry.dataset.m); if (saved !== undefined) row.scrollLeft = saved;
+      if (holdRow === entry.dataset.m) { holdRow = null; return; }   // just unlogged here: no glide; the prior-day rest applies when the day is revisited
       const on = entry.querySelector('.chip.on') || entry.querySelector('.chip[data-anchor]');
       let target = 0;
       if (on) {

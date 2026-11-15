@@ -88,7 +88,8 @@ appear automatically).
 
 ## Keyboard
 
-`←` / `→` previous and next month and `T` today (calendar view), `G` graph/calendar, `⌘⇧L` toggle light/dark. Click a day to select it, then click option chips to log. A metric with nothing logged on the selected
+`←` / `→` previous and next month and `T` today (calendar view), `G` graph/calendar, `⌘⇧L` toggle light/dark. Click a day to select it, then click option chips to log. Clicking a specific lane in a day cell (or a
+metric's strip in the graph) also scrolls the day-entry panel to that metric's row and flashes it. A metric with nothing logged on the selected
 day rests its chip row on the most recent earlier value (up to a week back), since a new day usually
 resembles the one before; nothing is logged until a chip is tapped. Edit on a metric card reveals its options plus
 + Option, Duplicate (copies the metric and its options, placed right after it) and Delete. The < button in the
