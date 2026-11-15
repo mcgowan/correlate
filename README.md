@@ -29,7 +29,8 @@ HUD readouts on the calendar scope, a TARGET DAY panel and a status bar (no cloc
 
 A **metric** has a name and an ordered list of **options**. Each option has a label, a colour and a
 numeric value. A day holds at most one option per metric. Colour convention in the default metrics: one hue
-per metric, lighter shades for lower values, so correlation reads by shade across lanes.
+per metric, lighter shades for lower values, so correlation reads by shade down the calendar's lanes (a
+colour square beside each option label).
 
 The **day score** is the sum of the values of the options logged that day.
 

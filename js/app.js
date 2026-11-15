@@ -452,8 +452,8 @@
       const e = state.entries[key] || {};
       const lanes = shown.map(m => {
         const o = e[m.id] && optionOf(m, e[m.id]);
-        if (!o) return `<div class="lane empty" data-m="${m.id}" title="${esc(m.name)}: not logged">&nbsp;</div>`;
-        return `<div class="lane${isLight(o.color) ? ' dim' : ''}" data-m="${m.id}" style="--c:${o.color}" title="${esc(m.name)}: ${esc(o.label)} (${o.value})">${esc(o.label)}</div>`;
+        if (!o) return `<div class="lane empty" data-m="${m.id}" title="${esc(m.name)}: not logged"><i></i></div>`;
+        return `<div class="lane" data-m="${m.id}" style="--c:${o.color}" title="${esc(m.name)}: ${esc(o.label)} (${o.value})"><i></i><span>${esc(o.label)}</span></div>`;
       }).join('');
       cell.innerHTML = `<div class="day-head"><span class="d num">${d}</span><span class="score num">${sc.n ? sc.sum : ''}</span></div><div class="lanes">${lanes}</div>`;
       cell.onclick = ev => {

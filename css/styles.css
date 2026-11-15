@@ -259,7 +259,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 600; }
 .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .day {
   background: var(--surface); border: 1px solid var(--line); border-radius: 0;
-  padding: 6px; min-height: 96px; text-align: left; display: flex; flex-direction: column; gap: 6px;
+  padding: 6px 8px; min-height: 96px; text-align: left; display: flex; flex-direction: column; gap: 6px;
   transition: border-color .12s, box-shadow .12s; min-width: 0;
 }
 .day:hover { border-color: var(--line-strong); }
@@ -270,15 +270,15 @@ h3 { margin: 0; font-size: 14px; font-weight: 600; }
 .day-head .d { font-size: 12px; font-weight: 600; color: var(--ink-2); width: 20px; height: 20px; display: grid; place-items: center; border-radius: 0; }
 .day.today .d { background: var(--today); color: var(--accent-ink); }
 .day-head .score { font-size: 11px; color: var(--muted); }
-.lanes { display: flex; flex-direction: column; gap: 3px; }
-.lane {
-  height: 14px; border-radius: 0; background: var(--c, var(--lane-empty));
-  font-size: 10px; line-height: 14px; padding: 0 5px; color: #fff; font-weight: 500;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  text-shadow: 0 0 2px rgba(0,0,0,.35);
-}
-.lane.empty { color: transparent; text-shadow: none; }
-.lane.dim { color: #171a21; text-shadow: none; }
+.lanes { display: flex; flex-direction: column; }
+/* every row the same height (empty ones included) so dividers line up across the week */
+.lane { height: 23px; box-sizing: border-box; border-top: 1px solid var(--line); }
+.lane:first-child { border-top-color: transparent; }
+/* a colour square beside the option label, like the option rows in the metrics panel */
+.lane { display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: var(--ink); min-width: 0; }   /* same size as the option rows in the metrics panel */
+.lane i { width: 14px; height: 14px; flex: none; background: var(--c); border: 1px solid rgba(0,0,0,.12); }
+.lane span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane.empty i { background: transparent; border: 1px solid var(--line-strong); }
 
 /* ---------- Graph view ---------- */
 .view-switch, .seg { display: inline-flex; }
@@ -379,7 +379,9 @@ h3 { margin: 0; font-size: 14px; font-weight: 600; }
 @media (max-width: 560px) {
   .pane { padding: 14px 16px; }
   .day { min-height: 72px; padding: 4px; }
-  .lane { font-size: 0; height: 10px; }
+  .lane span { display: none; }
+  .lane { height: 15px; line-height: 14px; }
+  .lane i { width: 10px; height: 10px; }
   .day-head .score { display: none; }
   .monthnav h2 { min-width: 0; font-size: 14px; }
 }
